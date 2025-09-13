@@ -1,0 +1,7 @@
+<input [type]="type" (change)="onInputFileChange($event)" [accept]="accept" style="display: none;" [multiple]="allowMultiple? true: false" #inputFile/>
+<ion-select interface="action-sheet" style="display: none;" (ionChange)="selectOptionCB($event);" #selectOption>
+  <ion-select-option value="file" *ngIf="accept.includes('pdf') || accept == '*' || (!isGalleryAvailable && !isCameraAvailable)">{{ 'Select a file' | translate }}</ion-select-option>
+  <ion-select-option value="gallery" *ngIf="isGalleryAvailable">{{ 'Select a photo from your gallery' | translate }}</ion-select-option>
+  <ion-select-option value="camera" *ngIf="isCameraAvailable">{{ 'Take a new photo' | translate }}</ion-select-option>
+  <ion-select-option [value]="action" *ngFor="let action of customActions">{{ action.label }}</ion-select-option>
+</ion-select>
