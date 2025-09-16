@@ -1,7 +1,7 @@
 import {Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild} from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { IonSelect, AlertController, Platform } from '@ionic/angular';
+import { IonSelect, AlertController, Platform, ActionSheetButton, IonActionSheet } from '@ionic/angular';
 import { Capacitor } from '@capacitor/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
@@ -41,7 +41,7 @@ export class CustomAction {
 })
 export class FileCameraComponent  implements OnInit {
   @ViewChild('inputFile') inputFile!: ElementRef;
-  @ViewChild('selectOption') selectOption!: IonSelect;
+  @ViewChild('actionSheet') actionSheet!: IonActionSheet;
 
   @Input() accept = "image/*,application/pdf";
   @Input() type = "file";
@@ -49,10 +49,14 @@ export class FileCameraComponent  implements OnInit {
   @Input() maxFiles = 1;
   @Output() ionChange = new EventEmitter<any>();
   @Input() customActions: CustomAction[] = [] 
+  @Input() header: string | null = null;
+  @Input() subHeader: string | null = null;
 
   isCameraAvailable = false
   isGalleryAvailable = false
   latestInputEvent: any = null
+
+  buttons: ActionSheetButton[] = []
 
   constructor(
     private translate: TranslateService,
@@ -117,11 +121,48 @@ export class FileCameraComponent  implements OnInit {
   }
 
   click(event: any) {
-    if(!this.isCameraAvailable && !this.isGalleryAvailable && this.customActions.length == 0)
+
+    this.buttons = []
+    if(this.accept.includes('pdf') || this.accept == '*' || (!this.isGalleryAvailable && !this.isCameraAvailable)) {
+      this.buttons.push({
+        text: this.translate.instant("Select a file"),
+        handler: () => {
+          this.selectActionCB('file')
+        }
+      })
+    }
+
+    if(this.isGalleryAvailable) {
+      this.buttons.push({
+        text: this.translate.instant("Select a photo from your gallery"),
+        handler: () => {
+          this.selectActionCB('gallery')
+        }
+      })
+    }
+
+    if(this.isCameraAvailable) {
+      this.buttons.push({
+        text: this.translate.instant("Take a new photo"),
+        handler: () => {
+          this.selectActionCB('camera')
+        }
+      })
+    }
+
+    for(let action of this.customActions) {
+      this.buttons.push({
+        text: action.label,
+        handler: () => {
+          this.selectActionCB(action.label)
+        }
+      })
+    }
+
+    if(!this.isCameraAvailable && !this.isGalleryAvailable && this.customActions.length == 0 && this.header == null && this.subHeader == null)
       this.inputFile.nativeElement.click();
     else {
-      this.selectOption.value = undefined;
-      this.selectOption.open(event);
+      this.actionSheet.present();
     }
 
     //Set the previous input event to null to allow the user to re-select the same file
@@ -129,15 +170,18 @@ export class FileCameraComponent  implements OnInit {
       this.latestInputEvent.target.value = null;
   }
 
-  async selectOptionCB(event: any) {
-    if(event.detail.value == undefined)
-      return 
+  async selectActionCB(action: string) {
 
-    if(event.detail.value.event) {
-      event.detail.value.event.emit()
-    } else if(!this.isCameraAvailable && !this.isGalleryAvailable) {
+    for(let a of this.customActions) {
+      if(a.label == action) {
+        a.event.emit()
+        return
+      }
+    }
+
+    if(!this.isCameraAvailable && !this.isGalleryAvailable) {
       this.inputFile.nativeElement.click();
-    } else if(event.detail.value == 'file') {
+    } else if(action == 'file') {
       const result = await FilePicker.pickFiles({limit: 1, readData: true, types: this.accept.replace('image/*', 'image/png,image/jpeg,image/heif,image/tiff').split(',')});
       const file = result.files[0];
       if (file.data) {
@@ -147,7 +191,7 @@ export class FileCameraComponent  implements OnInit {
         this.ionChange.emit(_event);
       }
     }
-    else if(event.detail.value == 'camera') {
+    else if(action == 'camera') {
       const image = await Camera.getPhoto({
         quality: 90,
         resultType: CameraResultType.DataUrl,
@@ -159,7 +203,7 @@ export class FileCameraComponent  implements OnInit {
       const _event = { target: { files: [dataURLtoFile(image.dataUrl ?? '', 'file.' + image.format)]}}
       this.ionChange.emit(_event);
     }
-    else if(event.detail.value == 'gallery') {
+    else if(action == 'gallery') {
       const result = await FilePicker.pickImages({limit: this.allowMultiple ? this.maxFiles : 1, ordered: true, skipTranscoding: false, readData: true});
 
       const _event: any = { target: { files: []}}
